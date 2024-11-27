@@ -10,6 +10,7 @@ use std::mem::size_of;
 use std::path::Path;
 
 const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+const END_TYPE_CODE: &str = "IEND";
 
 #[derive(Default, Debug)]
 struct Chunk {
@@ -41,7 +42,9 @@ impl fmt::Display for Chunk {
 }
 
 impl Chunk {
-    fn read<T: io::Read>(reader: &mut T) -> Result<Chunk, io::Error> {
+    fn read<T: io::Read + io::Seek>(reader: &mut T) -> Result<Chunk, io::Error> {
+        println!("[d] Current offset: {:#x}", reader.stream_position()?);
+
         let mut res: Chunk = Chunk::default();
 
         res.length = reader.read_u32::<BigEndian>()?;
@@ -74,12 +77,17 @@ fn main() -> Result<(), io::Error> {
         panic!("Not a PNG file");
     }
 
-    let mut is_eof = false;
-    while !is_eof {
+    let mut continue_parsing = true;
+    while continue_parsing {
         match Chunk::read(&mut reader) {
-            Ok(chunk) => println!("{}", chunk),
+            Ok(chunk) => {
+                println!("{}", chunk);
+                if chunk.type_code.eq(END_TYPE_CODE.as_bytes()) {
+                    continue_parsing = false;
+                }
+            }
             Err(error) => match error.kind() {
-                io::ErrorKind::UnexpectedEof => is_eof = true,
+                io::ErrorKind::UnexpectedEof => continue_parsing = false,
                 _ => eprintln!("Unknown error: {error}"),
             },
         }
