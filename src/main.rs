@@ -4,8 +4,8 @@
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use std::fmt;
 use std::fs::File;
-use std::io::prelude::*;
-use std::io::BufReader;
+use std::io;
+use std::io::Read;
 use std::mem::size_of;
 use std::path::Path;
 
@@ -34,34 +34,36 @@ impl fmt::Display for Chunk {
 
         write!(
             f,
-            "Chunk {}, Data Length: {}B, CRC: {:#x}\n{}",
+            "Chunk {}, Data Length: {} Bytes, CRC: {:#x}\n{}",
             type_code, self.length, self.crc, data_fmt
         )
     }
 }
 
 impl Chunk {
-    fn read<T: Read>(reader: &mut T) -> Chunk {
+    fn read<T: io::Read>(reader: &mut T) -> Result<Chunk, io::Error> {
         let mut res: Chunk = Chunk::default();
 
-        res.length = reader.read_u32::<BigEndian>().unwrap();
-        reader.read_exact(&mut res.type_code[..]).unwrap();
+        res.length = reader.read_u32::<BigEndian>()?;
+        reader.read_exact(res.type_code.as_mut_slice())?;
 
         res.data.resize(res.length as usize, 0);
-        reader.read_exact(&mut res.data[..]).unwrap();
+        reader.read_exact(res.data.as_mut_slice())?;
 
-        res.crc = reader.read_u32::<BigEndian>().unwrap();
+        res.crc = reader.read_u32::<BigEndian>()?;
 
-        res
+        Ok(res)
     }
 }
 
-fn main() -> Result<(), std::io::Error> {
-    let img_path = Path::new("Z:/prog/prob/png_parser/res/red_pixel.png");
+fn main() -> Result<(), io::Error> {
+    //let img_path = Path::new("Z:/prog/prob/png_parser/res/red_pixel.png");
+    // let img_path = Path::new("C:\\Users\\antar\\Downloads\\PNG_transparency_demonstration_1.png");
+    let img_path = Path::new("C:\\Users\\antar\\Downloads\\duck.png");
     println!("Image path: {}", img_path.canonicalize()?.display());
 
     let img = File::open(img_path)?;
-    let mut reader = BufReader::new(img);
+    let mut reader = io::BufReader::new(img);
 
     let mut sign_buf: [u8; SIGNATURE.len()] = [0; SIGNATURE.len()];
     reader.read_exact(&mut sign_buf)?;
@@ -72,8 +74,16 @@ fn main() -> Result<(), std::io::Error> {
         panic!("Not a PNG file");
     }
 
-    let first_chunk = Chunk::read(&mut reader);
-    println!("{}", first_chunk);
+    let mut is_eof = false;
+    while !is_eof {
+        match Chunk::read(&mut reader) {
+            Ok(chunk) => println!("{}", chunk),
+            Err(error) => match error.kind() {
+                io::ErrorKind::UnexpectedEof => is_eof = true,
+                _ => eprintln!("Unknown error: {error}"),
+            },
+        }
+    }
 
     Ok(())
 }
