@@ -9,9 +9,10 @@ use std::path::Path;
 
 use crate::chunk_entry::ChunkEntry;
 
-pub mod chunk_entry;
+mod chunk_entry;
+mod read;
 
-const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+pub const SIGNATURE: &[u8] = &[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const END_TYPE_CODE: &str = "IEND";
 
 fn main() -> Result<(), io::Error> {
